@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INDICATOR | Premium Hardware Store</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+    <style>
+        body {
+            background-color: #020617; /* Глубокий темный фон */
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(34, 197, 94, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(15, 23, 42, 1) 0px, transparent 50%);
+            color: #f8fafc;
+            min-height: 100vh;
+        }
+        .indicator-green { color: #22c55e; }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+        .glass-card:hover {
+            border-color: rgba(34, 197, 94, 0.4);
+            transform: translateY(-5px);
+        }
+        .neon-text { text-shadow: 0 0 15px rgba(34, 197, 94, 0.6); }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in { animation: fadeInUp 0.6s ease forwards; }
+    </style>
+</head>
+<body class="pb-20">
+
+    <header class="bg-slate-950/60 backdrop-blur-xl border-b border-slate-800 sticky top-0 z-50">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="bg-green-500 p-2 rounded-lg shadow-[0_0_15px_rgba(34,197,94,0.4)]">
+                    <i class="fas fa-microchip text-black text-xl"></i>
+                </div>
+                <span class="text-2xl font-black italic indicator-green tracking-tighter neon-text">INDICATOR</span>
+            </div>
+            
+            <div class="flex items-center space-x-6">
+                <button onclick="showCart()" class="relative p-2 text-slate-400 hover:text-green-400 transition">
+                    <i class="fas fa-shopping-basket text-xl"></i>
+                    <span id="cart-count" class="absolute -top-1 -right-1 bg-green-500 text-black text-[10px] rounded-full h-4 w-4 flex items-center justify-center font-bold">0</span>
+                </button>
+                <button id="login-btn" onclick="toggleLoginModal()" class="text-slate-200 font-bold hover:text-green-400 transition">Войти</button>
+                <button onclick="toggleAdminForm()" class="bg-slate-800 text-slate-400 p-2 rounded-lg hover:bg-slate-700"><i class="fas fa-cog"></i></button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-6 py-16">
+        <div id="admin-form" class="hidden mb-12">
+            <div class="glass-card p-8 rounded-3xl max-w-2xl mx-auto border-green-500/30">
+                <h3 class="text-2xl font-bold mb-6 indicator-green">Добавить товар</h3>
+                <form id="add-laptop-form" class="space-y-4">
+                    <input type="text" id="name" placeholder="Название модели" required class="w-full p-4 bg-slate-900/50 border border-slate-700 rounded-xl text-white outline-none focus:border-green-500">
+                    <input type="number" id="price" placeholder="Цена ($)" required class="w-full p-4 bg-slate-900/50 border border-slate-700 rounded-xl text-white outline-none focus:border-green-500">
+                    <button type="submit" class="w-full bg-white text-black py-4 rounded-xl font-black hover:bg-green-500 hover:text-white transition">СОХРАНИТЬ</button>
+                </form>
+            </div>
+        </div>
+
+        <h3 class="text-4xl font-black mb-12 text-white italic">КАТАЛОГ <span class="indicator-green neon-text">HARDWARE</span></h3>
+        <div id="laptop-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            </div>
+    </main>
+
+    <script>
+        const API_URL = "http://127.0.0.1:8000";
+        let cart = JSON.parse(localStorage.getItem('indicator_cart')) || [];
+
+        function toggleAdminForm() { document.getElementById('admin-form').classList.toggle('hidden'); }
+        
+        async function fetchLaptops() {
+            try {
+                const res = await fetch(`${API_URL}/items/`);
+                const data = await res.json();
+                const list = document.getElementById('laptop-list');
+                list.innerHTML = '';
+                
+                data.forEach((item, index) => {
+                    const div = document.createElement('div');
+                    div.className = `glass-card p-6 rounded-3xl relative group fade-in`;
+                    div.style.animationDelay = `${index * 0.1}s`;
+                    div.innerHTML = `
+                        <div class="h-40 bg-slate-950/40 rounded-2xl mb-6 flex items-center justify-center border border-slate-800/50">
+                            <i class="fas fa-laptop text-4xl text-green-500/20"></i>
+                        </div>
+                        <h4 class="text-xl font-bold text-white mb-2">${item.name}</h4>
+                        <div class="flex justify-between items-center">
+                            <span class="text-2xl font-black indicator-green">$${item.price}</span>
+                            <button onclick="addToCart('${item.name}', ${item.price})" class="bg-green-600 text-black h-10 w-10 rounded-lg flex items-center justify-center hover:bg-green-400">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>`;
+                    list.appendChild(div);
+                });
+            } catch (e) {
+                console.error("Ошибка подключения к бэкенду");
+            }
+        }
+
+        function addToCart(name, price) {
+            cart.push({ name, price });
+            document.getElementById('cart-count').innerText = cart.length;
+            localStorage.setItem('indicator_cart', JSON.stringify(cart));
+        }
+
+        window.onload = fetchLaptops;
+    </script>
+</body>
+</html>

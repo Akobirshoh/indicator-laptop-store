@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INDICATOR | Premium Store</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+    <style>
+        /* Глубокий темный фон с градиентом */
+        body {
+            background-color: #020617;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(34, 197, 94, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(15, 23, 42, 1) 0px, transparent 50%);
+            color: #f8fafc;
+            min-height: screen;
+        }
+
+        .indicator-green { color: #22c55e; }
+        .bg-indicator-green { background-color: #22c55e; }
+        
+        /* Эффект матового стекла */
+        .glass-card {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(34, 197, 94, 0.4);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px -10px rgba(34, 197, 94, 0.2);
+        }
+
+        .neon-text {
+            text-shadow: 0 0 15px rgba(34, 197, 94, 0.6);
+        }
+
+        /* Анимация появления */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in { animation: fadeInUp 0.6s ease forwards; }
+    </style>
+</head>
+<body class="pb-20">
+
+    <header class="bg-slate-950/60 backdrop-blur-xl border-b border-slate-800 sticky top-0 z-50">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="bg-green-500 p-2 rounded-lg shadow-[0_0_15px_rgba(34,197,94,0.4)]">
+                    <i class="fas fa-microchip text-black text-xl"></i>
+                </div>
+                <span class="text-2xl font-black italic indicator-green tracking-tighter neon-text">INDICATOR</span>
+            </div>
+            
+            <div class="flex items-center space-x-8">
+                <button onclick="showCart()" class="relative p-2 text-slate-400 hover:text-green-400 transition">
+                    <i class="fas fa-shopping-basket text-xl"></i>
+                    <span id="cart-count" class="absolute -top-1 -right-1 bg-green-500 text-black text-[10px] rounded-full h-4 w-4 flex items-center justify-center font-bold">0</span>
+                </button>
+                
+                <button id="login-btn" onclick="toggleLoginModal()" class="text-slate-200 font-bold hover:text-green-400 transition border-b-2 border-transparent hover:border-green-500 pb-1">
+                    Войти
+                </button>
+                
+                <button onclick="toggleAdminForm()" class="bg-slate-800 text-slate-400 p-2 rounded-lg hover:bg-slate-700 transition">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div id="login-modal" class="hidden fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
+        <div class="glass-card p-8 rounded-3xl w-full max-w-sm border-green-500/20">
+            <h3 class="text-2xl font-bold mb-6 text-white italic">Доступ к профилю</h3>
+            <input type="email" id="login-email" placeholder="Email" class="w-full p-4 bg-slate-900/50 border border-slate-700 rounded-2xl mb-4 text-white outline-none focus:border-green-500 transition">
+            <input type="password" id="login-password" placeholder="Пароль" class="w-full p-4 bg-slate-900/50 border border-slate-700 rounded-2xl mb-6 text-white outline-none focus:border-green-500 transition">
+            <div class="flex flex-col space-y-3">
+                <button onclick="login()" class="w-full bg-green-600 text-white py-4 rounded-2xl font-black hover:bg-green-500 transition shadow-lg shadow-green-900/20">ВОЙТИ</button>
+                <button onclick="toggleLoginModal()" class="w-full text-slate-500 py-2 hover:text-slate-300 transition">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <section id="admin-form" class="hidden container mx-auto px-6 mt-10">
+        <div class="glass-card p-8 rounded-3xl max-w-2xl mx-auto border-green-500/30">
+            <h3 class="text-2xl font-bold mb-6 indicator-green">Добавить в инвентарь</h3>
+            <form id="add-laptop-form" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="text" id="name" placeholder="Название (например: Razer Blade 16)" required class="p-4 bg-slate-900/50 border border-slate-700 rounded-xl text-white outline-none focus:border-green-500">
+                    <input type="number" id="price" placeholder="Цена ($)" required class="p-4 bg-slate-900/50 border border-slate-700 rounded-xl text-white outline-none focus:border-green-500">
+                </div>
+                <button type="submit" class="w-full bg-white text-black py-4 rounded-xl font-black hover:bg-green-500 hover:text-white transition">СОХРАНИТЬ ТОВАР</button>
+            </form>
+        </div>
+    </section>
+
+    <main class="container mx-auto px-6 py-16">
+        <div class="flex items-center space-x-4 mb-12">
+            <h3 class="text-4xl font-black tracking-tight text-white italic">HARDWARE <span class="indicator-green neon-text">LIST</span></h3>
+            <div class="h-[2px] flex-grow bg-slate-800"></div>
+        </div>
+        
+        <div id="laptop-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div class="h-80 bg-slate-900/20 animate-pulse rounded-3xl"></div>
+            <div class="h-80 bg-slate-900/20 animate-pulse rounded-3xl"></div>
+        </div>
+    </main>
+
+    <script>
+        const API_URL = "http://127.0.0.1:8000";
+        let cart = JSON.parse(localStorage.getItem('indicator_cart')) || [];
+
+        function toggleLoginModal() { document.getElementById('login-modal').classList.toggle('hidden'); }
+        function toggleAdminForm() { document.getElementById('admin-form').classList.toggle('hidden'); }
+        
+        function updateCartUI() {
+            document.getElementById('cart-count').innerText = cart.length;
+            localStorage.setItem('indicator_cart', JSON.stringify(cart));
+        }
+
+        function showCart() {
+            if (cart.length === 0) return alert("Ваша корзина пуста.");
+            alert("В корзине товаров: " + cart.length + "\n\n" + cart.map(i => i.name).join('\n'));
+        }
+
+        async function fetchLaptops() {
+            try {
+                const res = await fetch(`${API_URL}/items/`);
+                const data = await res.json();
+                const list = document.getElementById('laptop-list');
+                list.innerHTML = '';
+                
+                data.forEach((item, index) => {
+                    const div = document.createElement('div');
+                    div.className = `glass-card p-6 rounded-3xl relative group fade-in`;
+                    div.style.animationDelay = `${index * 0.1}s`;
+                    div.innerHTML = `
+                        <button onclick="deleteLaptop(${item.id})" class="absolute top-4 right-4 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                        <div class="h-40 bg-slate-950/40 rounded-2xl mb-6 flex items-center justify-center border border-slate-800/50">
+                            <i class="fas fa-laptop-code text-5xl text-green-500/10 group-hover:text-green-500 transition-all duration-500"></i>
+                        </div>
+                        <h4 class="text-xl font-bold text-white mb-1 truncate">${item.name}</h4>
+                        <p class="text-slate-500 text-xs mb-6 uppercase tracking-widest font-bold">Official Stock</p>
+                        <div class="flex justify-between items-center">
+                            <span class="text-3xl font-black indicator-green neon-text">$${item.price}</span>
+                            <button onclick="addToCart('${item.name}', ${item.price})" class="bg-green-600 hover:bg-green-400 text-black h-12 w-12 rounded-xl transition flex items-center justify-center shadow-lg shadow-green-900/40">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>`;
+                    list.appendChild(div);
+                });
+            } catch (e) {
+                document.getElementById('laptop-list').innerHTML = `
+                    <div class="col-span-full text-center py-20 bg-red-950/20 rounded-3xl border border-red-900/30">
+                        <i class="fas fa-wifi text-red-500 text-4xl mb-4"></i>
+                        <h2 class="text-red-500 font-bold">ОШИБКА ПОДКЛЮЧЕНИЯ К СЕРВЕРУ</h2>
+                        <p class="text-red-400/60 text-sm">Проверьте: uvicorn app.main:app --reload</p>
+                    </div>`;
+            }
+        }
+
+        async function login() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const formData = new FormData();
+            formData.append('username', email);
+            formData.append('password', password);
+
+            try {
+                const res = await fetch(`${API_URL}/auth/login`, { method: 'POST', body: formData });
+                if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem('token', data.access_token);
+                    alert("Авторизация успешна!");
+                    toggleLoginModal();
+                    document.getElementById('login-btn').innerText = "Профиль";
+                    document.getElementById('login-btn').classList.add('indicator-green');
+                } else { alert("Доступ запрещен!"); }
+            } catch (e) { alert("Сервер не отвечает"); }
+        }
+
+        function addToCart(name, price) {
+            cart.push({ name, price });
+            updateCartUI();
+            // Маленький визуальный эффект при добавлении
+            alert("Добавлено: " + name);
+        }
+
+        async function deleteLaptop(id) {
+            if (confirm("Удалить этот артикул?")) {
+                await fetch(`${API_URL}/items/${id}`, { method: 'DELETE' });
+                fetchLaptops();
+            }
+        }
+
+        document.getElementById('add-laptop-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const payload = {
+                name: document.getElementById('name').value,
+                price: parseFloat(document.getElementById('price').value),
+                category_id: 1, description: ""
+            };
+            const res = await fetch(`${API_URL}/items/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if(res.ok) {
+                toggleAdminForm();
+                fetchLaptops();
+                document.getElementById('add-laptop-form').reset();
+            }
+        };
+
+        window.onload = () => {
+            fetchLaptops();
+            updateCartUI();
+        };
+    </script>
+</body>
+</html>
