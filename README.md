@@ -1,6 +1,11 @@
 # 💻 INDICATOR — Магазин ноутбуков и аксессуаров
 
-Бэкенд-система для управления каталогом товаров, корзиной и заказами.
+![Backend Tests](https://github.com/Akobirshoh/indicator-laptop-store/actions/workflows/backend-tests.yml/badge.svg)
+![Frontend Tests](https://github.com/Akobirshoh/indicator-laptop-store/actions/workflows/frontend-tests.yml/badge.svg)
+![Code Quality](https://github.com/Akobirshoh/indicator-laptop-store/actions/workflows/code-quality.yml/badge.svg)
+[![codecov](https://codecov.io/gh/Akobirshoh/indicator-laptop-store/branch/main/graph/badge.svg)](https://codecov.io/gh/Akobirshoh/indicator-laptop-store)
+
+Полнофункциональная система для управления магазином электроники с современным фронтенд-приложением на React и надежным бэкендом на FastAPI.
 
 ## 🚀 Быстрый старт (Docker)
 Проект упакован в Docker для быстрой развертки (Занятия 21–22).

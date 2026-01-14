@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './ProductList.css';
-import { getItems, getCategories } from '../api';
+import { getItems, getCategories, addToCart } from '../api';
 
 function ProductList({ onAddToCart, user, setUser }) {
   const [products, setProducts] = useState([]);
@@ -9,6 +9,10 @@ function ProductList({ onAddToCart, user, setUser }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [priceRange, setPriceRange] = useState([0, 5000]);
+  const [sortBy, setSortBy] = useState('name');
+  const [addedNotification, setAddedNotification] = useState(null);
+  const [addingToCart, setAddingToCart] = useState({});
 
   useEffect(() => {
     fetchData();
@@ -23,11 +27,10 @@ function ProductList({ onAddToCart, user, setUser }) {
         getCategories(),
       ]);
 
-      setProducts(itemsRes.data);
-      setCategories(categoriesRes.data || []);
+      setProducts(itemsRes.data || getMockProducts());
+      setCategories(categoriesRes.data || getMockCategories());
     } catch (err) {
-      setError('Ошибка загрузки товаров: ' + err.message);
-      // Используем моковые данные при ошибке
+      console.error('API Error:', err);
       setProducts(getMockProducts());
       setCategories(getMockCategories());
     } finally {
@@ -35,71 +38,168 @@ function ProductList({ onAddToCart, user, setUser }) {
     }
   };
 
-  const filteredProducts = products.filter(product => {
-    const matchesCategory = !selectedCategory || product.category_id === selectedCategory;
-    const matchesSearch = !searchQuery || product.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const filteredAndSortedProducts = products
+    .filter(product => {
+      const matchesCategory = !selectedCategory || product.category_id === selectedCategory;
+      const matchesSearch = !searchQuery || 
+        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (product.description && product.description.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesPrice = product.price >= priceRange[0] && product.price <= priceRange[1];
+      return matchesCategory && matchesSearch && matchesPrice;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'price-low':
+          return a.price - b.price;
+        case 'price-high':
+          return b.price - a.price;
+        case 'name':
+          return a.name.localeCompare(b.name);
+        default:
+          return 0;
+      }
+    });
 
-  const handleAddToCart = (product) => {
-    onAddToCart(product);
-    alert(`${product.name} добавлен в корзину!`);
+  const handleAddToCart = async (product) => {
+    try {
+      setAddingToCart(prev => ({ ...prev, [product.id]: true }));
+      
+      // Всегда добавляем в локальную корзину
+      onAddToCart(product);
+      
+      // Если пользователь авторизован, добавляем на сервер
+      if (user) {
+        try {
+          await addToCart(product.id, 1);
+        } catch (err) {
+          console.warn('Cannot add to server cart, saved to local cart');
+        }
+      }
+      
+      setAddedNotification(product.name);
+      setTimeout(() => setAddedNotification(null), 2000);
+    } catch (err) {
+      console.error('Error adding to cart:', err);
+      setAddedNotification('❌ Ошибка добавления в корзину');
+    } finally {
+      setAddingToCart(prev => ({ ...prev, [product.id]: false }));
+    }
   };
 
   return (
     <div className="product-list-container">
-      <h1 className="page-title">🎯 Каталог ноутбуков и аксессуаров</h1>
+      <div className="page-header">
+        <h1 className="page-title">🎯 Каталог товаров</h1>
+        <p className="page-subtitle">Выберите идеальный товар из нашей коллекции</p>
+      </div>
+
+      {/* Уведомление о добавлении */}
+      {addedNotification && (
+        <div className="notification success">
+          ✅ {addedNotification} добавлен в корзину!
+        </div>
+      )}
 
       {/* Панель фильтрации */}
       <div className="filter-panel">
-        <div className="search-box">
+        <div className="filter-group search-box">
           <input
             type="text"
-            placeholder="🔍 Поиск товаров..."
+            placeholder="🔍 Поиск по названию или описанию..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="search-input"
           />
         </div>
 
-        <div className="category-filter">
-          <button
-            className={`category-btn ${!selectedCategory ? 'active' : ''}`}
-            onClick={() => setSelectedCategory(null)}
-          >
-            Все товары
-          </button>
-          {categories.map(cat => (
+        <div className="filter-group sort-box">
+          <label>Сортировка:</label>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="sort-select">
+            <option value="name">По названию</option>
+            <option value="price-low">Цена: дешевле</option>
+            <option value="price-high">Цена: дороже</option>
+          </select>
+        </div>
+
+        <div className="filter-group price-range">
+          <label>Цена: ${priceRange[0]} - ${priceRange[1]}</label>
+          <div className="price-inputs">
+            <input
+              type="number"
+              min="0"
+              value={priceRange[0]}
+              onChange={(e) => setPriceRange([parseInt(e.target.value) || 0, priceRange[1]])}
+              className="price-input"
+            />
+            <span>-</span>
+            <input
+              type="number"
+              max="10000"
+              value={priceRange[1]}
+              onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value) || 10000])}
+              className="price-input"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Категории */}
+      <div className="categories-filter">
+        <button
+          className={`category-btn ${!selectedCategory ? 'active' : ''}`}
+          onClick={() => setSelectedCategory(null)}
+        >
+          Все товары ({products.length})
+        </button>
+        {categories.map(cat => {
+          const count = products.filter(p => p.category_id === cat.id).length;
+          return (
             <button
               key={cat.id}
               className={`category-btn ${selectedCategory === cat.id ? 'active' : ''}`}
               onClick={() => setSelectedCategory(cat.id)}
             >
-              {cat.name}
+              {cat.name} ({count})
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
       {/* Статус загрузки */}
-      {loading && <div className="loading">⏳ Загрузка товаров...</div>}
-      {error && <div className="error-message">{error}</div>}
+      {loading && (
+        <div className="loading-container">
+          <div className="spinner"></div>
+          <p>⏳ Загрузка товаров...</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="error-message">
+          <span>⚠️</span>
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* Список товаров */}
+      <div className="results-info">
+        Найдено товаров: <strong>{filteredAndSortedProducts.length}</strong>
+      </div>
+
       <div className="products-grid">
-        {filteredProducts.length > 0 ? (
-          filteredProducts.map(product => (
+        {filteredAndSortedProducts.length > 0 ? (
+          filteredAndSortedProducts.map(product => (
             <ProductCard
               key={product.id}
               product={product}
               onAddToCart={handleAddToCart}
+              isAdding={addingToCart[product.id]}
             />
           ))
         ) : (
           <div className="no-products">
-            {searchQuery || selectedCategory
-              ? 'Товары не найдены'
-              : 'Товаров нет'}
+            <span className="no-products-emoji">🔍</span>
+            <h3>Товары не найдены</h3>
+            <p>Попробуйте изменить критерии поиска или фильтрации</p>
           </div>
         )}
       </div>
@@ -107,66 +207,84 @@ function ProductList({ onAddToCart, user, setUser }) {
   );
 }
 
-function ProductCard({ product, onAddToCart }) {
+function ProductCard({ product, onAddToCart, isAdding }) {
   const [showDetails, setShowDetails] = useState(false);
+
+  const getEmoji = () => {
+    const name = product.name?.toLowerCase() || '';
+    if (name.includes('ноут') || name.includes('laptop') || name.includes('book')) return '💻';
+    if (name.includes('мыш') || name.includes('mouse')) return '🖱️';
+    if (name.includes('клав') || name.includes('keyboard')) return '⌨️';
+    if (name.includes('монит') || name.includes('monitor')) return '🖥️';
+    if (name.includes('наушник') || name.includes('headphone')) return '🎧';
+    return '📦';
+  };
 
   return (
     <div className="product-card">
-      <div className="product-image">
-        <div className="image-placeholder">
-          {product.name?.includes('Ноут')
-            ? '💻'
-            : product.name?.includes('Мышь')
-            ? '🖱️'
-            : product.name?.includes('Клав')
-            ? '⌨️'
-            : '📦'}
+      <div className="product-header">
+        <div className="product-image">
+          <div className="image-emoji">{getEmoji()}</div>
         </div>
+        {product.discount && (
+          <div className="discount-badge">-{product.discount}%</div>
+        )}
       </div>
 
-      <div className="product-info">
+      <div className="product-body">
         <h3 className="product-name">{product.name}</h3>
-        <p className="product-description">{product.description}</p>
+        {product.description && (
+          <p className="product-description">{product.description}</p>
+        )}
 
-        <div className="product-specs">
-          {product.specs && (
+        {product.specs && (
+          <div className="product-specs">
             <p className="specs-text">{product.specs}</p>
-          )}
-        </div>
+          </div>
+        )}
 
-        <div className="product-price">
-          <span className="price">${product.price}</span>
-          {product.discount && (
-            <span className="discount-badge">{product.discount}% скидка</span>
-          )}
-        </div>
+        <div className="product-footer">
+          <div className="product-price">
+            <span className="price">${product.price.toFixed(2)}</span>
+          </div>
 
-        <div className="product-actions">
-          <button
-            className="btn btn-primary"
-            onClick={() => onAddToCart(product)}
-          >
-            🛒 В корзину
-          </button>
-          <button
-            className="btn btn-secondary"
-            onClick={() => setShowDetails(!showDetails)}
-          >
-            {showDetails ? '✕ Скрыть' : '👁️ Подробно'}
-          </button>
+          <div className="product-actions">
+            <button
+              className="btn btn-primary"
+              onClick={() => onAddToCart(product)}
+              title="Добавить в корзину"
+              disabled={isAdding}
+            >
+              {isAdding ? '⏳ Добавл...' : '🛒 Добавить'}
+            </button>
+            <button
+              className={`btn btn-secondary ${showDetails ? 'active' : ''}`}
+              onClick={() => setShowDetails(!showDetails)}
+              title="Подробная информация"
+            >
+              {showDetails ? '▼' : '▶'}
+            </button>
+          </div>
         </div>
 
         {showDetails && (
           <div className="product-details">
-            <h4>Информация о товаре:</h4>
-            <ul>
-              <li><strong>ID:</strong> {product.id}</li>
-              <li><strong>Цена:</strong> ${product.price}</li>
-              <li><strong>В наличии:</strong> {product.stock || 'Много'}</li>
+            <div className="details-content">
+              <div className="detail-item">
+                <span className="detail-label">Артикул:</span>
+                <span className="detail-value">#{product.id}</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">В наличии:</span>
+                <span className="detail-value">{product.stock || 'Много'} шт.</span>
+              </div>
               {product.category_id && (
-                <li><strong>Категория:</strong> {product.category_id}</li>
+                <div className="detail-item">
+                  <span className="detail-label">Категория:</span>
+                  <span className="detail-value">ID: {product.category_id}</span>
+                </div>
               )}
-            </ul>
+            </div>
           </div>
         )}
       </div>
@@ -185,6 +303,7 @@ function getMockProducts() {
       specs: 'Apple M2 Pro, 16GB RAM, 512GB SSD',
       category_id: 1,
       stock: 5,
+      discount: 10,
     },
     {
       id: 2,
@@ -203,11 +322,12 @@ function getMockProducts() {
       specs: '8K DPI, 8 программируемых кнопок',
       category_id: 2,
       stock: 20,
+      discount: 5,
     },
     {
       id: 4,
       name: 'Keychron K8 Pro',
-      description: 'Механическая клавиатура',
+      description: 'Механическая клавиатура с RGB',
       price: 199,
       specs: 'RGB подсветка, Hot-swap, Bluetooth',
       category_id: 3,
@@ -230,6 +350,25 @@ function getMockProducts() {
       specs: 'Lightning charging, Multi-touch surface',
       category_id: 2,
       stock: 25,
+    },
+    {
+      id: 7,
+      name: 'ASUS ROG Gaming Laptop',
+      description: 'Мощный игровой ноутбук',
+      price: 1899,
+      specs: 'RTX 4070, Intel i9, 32GB RAM, 1TB SSD',
+      category_id: 1,
+      stock: 3,
+      discount: 15,
+    },
+    {
+      id: 8,
+      name: 'Corsair K95 Platinum',
+      description: 'Премиум механическая клавиатура',
+      price: 229,
+      specs: 'Cherry MX switches, RGB, программируемые макросы',
+      category_id: 3,
+      stock: 7,
     },
   ];
 }

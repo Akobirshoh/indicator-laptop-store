@@ -79,7 +79,8 @@
 }
 
 .auth-btn,
-.logout-btn {
+.logout-btn,
+.profile-btn {
   background: white;
   color: #22c55e;
   border: none;
@@ -92,7 +93,8 @@
 }
 
 .auth-btn:hover,
-.logout-btn:hover {
+.logout-btn:hover,
+.profile-btn:hover {
   background: #f0f0f0;
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);

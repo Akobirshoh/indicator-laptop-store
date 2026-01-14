@@ -1,21 +1,34 @@
 .cart-container {
-  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 40px;
 }
 
 .page-title {
-  text-align: center;
-  color: #22c55e;
-  margin-bottom: 30px;
-  font-size: 28px;
+  font-size: 36px;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0 0 8px 0;
+  text-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+}
+
+.cart-subtitle {
+  font-size: 16px;
+  color: #94a3b8;
+  margin: 8px 0 0 0;
 }
 
 /* Пустая корзина */
 .empty-cart {
   text-align: center;
-  padding: 60px 20px;
-  background: white;
+  padding: 80px 40px;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.4) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.1);
   border-radius: 12px;
 }
 
@@ -52,7 +65,7 @@
 .cart-items-table {
   display: flex;
   flex-direction: column;
-  divide-y divide-gray-200;
+  border-top: 1px solid #e5e7eb;
 }
 
 /* Товар в корзине */

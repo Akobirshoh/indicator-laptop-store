@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+import os
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "INDICATOR"
@@ -9,7 +10,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     # Настройки базы данных (Занятие 3)
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost/indicator_db"
+    # Используем SQLite для простоты разработки (без PostgreSQL)
+    DATABASE_URL: str = "sqlite+aiosqlite:///./test.db"
 
     class Config:
         env_file = ".env"

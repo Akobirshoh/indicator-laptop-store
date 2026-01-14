@@ -1,79 +1,134 @@
 import React, { useState } from 'react';
 import './Cart.css';
-import { createOrder } from '../api';
+import { createOrder, removeFromCart } from '../api';
 
 function Cart({ items, onRemove, onUpdateQuantity, onClear, user }) {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [orderStatus, setOrderStatus] = useState('');
+  const [statusType, setStatusType] = useState('');
+  const [isRemoving, setIsRemoving] = useState({});
   const [deliveryInfo, setDeliveryInfo] = useState({
     address: '',
     phone: '',
+    email: user?.email || '',
   });
 
-  const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const shipping = items.length > 0 ? 10 : 0;
+  const tax = subtotal * 0.1;
+  const total = subtotal + shipping + tax;
 
   const handleCheckout = async () => {
     if (!user) {
-      alert('Пожалуйста, войдите перед оформлением заказа');
+      setOrderStatus('⚠️ Требуется авторизация для оформления заказа');
+      setStatusType('error');
       return;
     }
 
     if (!deliveryInfo.address || !deliveryInfo.phone) {
-      alert('Пожалуйста, заполните адрес доставки и телефон');
+      setOrderStatus('⚠️ Заполните адрес доставки и телефон');
+      setStatusType('error');
+      return;
+    }
+
+    if (items.length === 0) {
+      setOrderStatus('⚠️ Корзина пуста');
+      setStatusType('error');
       return;
     }
 
     setIsCheckingOut(true);
-    setOrderStatus('Обработка заказа...');
+    setOrderStatus('⏳ Обработка заказа...');
+    setStatusType('loading');
 
     try {
       const orderData = {
         items: items.map(item => ({
           item_id: item.id,
           quantity: item.quantity,
+          price: item.price
         })),
-        shipping_address: deliveryInfo.address,
-        phone: deliveryInfo.phone,
+        total_price: total,
+        delivery_address: deliveryInfo.address,
+        delivery_phone: deliveryInfo.phone,
+        status: 'pending'
       };
 
       const response = await createOrder(orderData);
+      
+      if (response.status === 200 || response.status === 201) {
+        setOrderStatus('✅ Заказ успешно оформлен! Спасибо за покупку!');
+        setStatusType('success');
+        
+        onClear();
+        setDeliveryInfo({ address: '', phone: '', email: user?.email || '' });
 
-      setOrderStatus('✅ Заказ успешно оформлен!');
-      onClear();
-      setDeliveryInfo({ address: '', phone: '' });
-
-      setTimeout(() => {
-        alert('Спасибо за покупку! Ваш заказ готов к отправке.');
-      }, 1000);
+        setTimeout(() => {
+          setOrderStatus('');
+        }, 3000);
+      }
     } catch (error) {
-      setOrderStatus('❌ Ошибка при оформлении заказа: ' + error.message);
+      console.error('Checkout error:', error);
+      const errorMsg = error.response?.data?.detail || error.message || 'Ошибка при оформлении заказа';
+      setOrderStatus('❌ ' + errorMsg);
+      setStatusType('error');
     } finally {
       setIsCheckingOut(false);
     }
   };
 
+  const handleRemoveItem = async (itemId) => {
+    try {
+      setIsRemoving(prev => ({ ...prev, [itemId]: true }));
+      
+      // Попытка удалить с сервера (если авторизован)
+      if (user) {
+        try {
+          await removeFromCart(itemId);
+        } catch (err) {
+          console.warn('Cannot remove from server cart, removing from local cart');
+        }
+      }
+      
+      // Всегда удаляем из локальной корзины
+      onRemove(itemId);
+    } finally {
+      setIsRemoving(prev => ({ ...prev, [itemId]: false }));
+    }
+  };
+
   return (
     <div className="cart-container">
-      <h1 className="page-title">🛒 Корзина покупок</h1>
+      <div className="page-header">
+        <h1 className="page-title">🛒 Корзина покупок</h1>
+        {items.length > 0 && (
+          <p className="cart-subtitle">Всего товаров: {itemCount}</p>
+        )}
+      </div>
 
       {items.length === 0 ? (
         <div className="empty-cart">
           <div className="empty-icon">🛍️</div>
           <h2>Корзина пуста</h2>
-          <p>Добавьте товары из каталога!</p>
+          <p>Добавьте товары из каталога, чтобы начать покупки</p>
+          <a href="/" className="btn btn-primary" style={{textDecoration: 'none', display: 'inline-block'}}>
+            ← Вернуться в каталог
+          </a>
         </div>
       ) : (
-        <div className="cart-content">
-          {/* Таблица товаров */}
+        <div className="cart-wrapper">
+          {/* Товары в корзине */}
           <div className="cart-items-section">
-            <div className="cart-items-table">
+            <h2 className="section-title">Товары в корзине</h2>
+            <div className="cart-items-list">
               {items.map(item => (
                 <CartItem
                   key={item.id}
                   item={item}
-                  onRemove={onRemove}
+                  onRemove={handleRemoveItem}
                   onUpdateQuantity={onUpdateQuantity}
+                  isRemoving={isRemoving[item.id]}
                 />
               ))}
             </div>
@@ -82,54 +137,73 @@ function Cart({ items, onRemove, onUpdateQuantity, onClear, user }) {
           {/* Итоги и оформление */}
           <div className="cart-summary-section">
             <div className="cart-summary">
-              <h2>Итоги</h2>
+              <h2>Сумма заказа</h2>
 
-              <div className="summary-line">
-                <span>Количество товаров:</span>
-                <span className="value">{itemCount}</span>
-              </div>
+              <div className="summary-items">
+                <div className="summary-line">
+                  <span>Товары ({itemCount}):</span>
+                  <span className="value">${subtotal.toFixed(2)}</span>
+                </div>
 
-              <div className="summary-line">
-                <span>Итоговая сумма:</span>
-                <span className="value price">${total.toFixed(2)}</span>
-              </div>
+                <div className="summary-line">
+                  <span>Налог (10%):</span>
+                  <span className="value">${tax.toFixed(2)}</span>
+                </div>
 
-              <div className="summary-line">
-                <span>Доставка:</span>
-                <span className="value">$10.00</span>
-              </div>
+                <div className="summary-line">
+                  <span>Доставка:</span>
+                  <span className="value">${shipping.toFixed(2)}</span>
+                </div>
 
-              <div className="summary-line total">
-                <span>К оплате:</span>
-                <span className="value">${(total + 10).toFixed(2)}</span>
+                <div className="summary-line total-line">
+                  <span>Итого:</span>
+                  <span className="value">${total.toFixed(2)}</span>
+                </div>
               </div>
 
               {/* Форма доставки */}
               <div className="delivery-form">
-                <h3>Информация о доставке</h3>
+                <h3>📦 Информация о доставке</h3>
 
-                <input
-                  type="text"
-                  placeholder="Адрес доставки"
-                  value={deliveryInfo.address}
-                  onChange={(e) =>
-                    setDeliveryInfo({ ...deliveryInfo, address: e.target.value })
-                  }
-                  className="input-field"
-                />
+                <div className="form-group">
+                  <label>Email</label>
+                  <input
+                    type="email"
+                    placeholder="your@email.com"
+                    value={user?.email || ''}
+                    disabled
+                    className="input-field"
+                  />
+                </div>
 
-                <input
-                  type="tel"
-                  placeholder="Номер телефона"
-                  value={deliveryInfo.phone}
-                  onChange={(e) =>
-                    setDeliveryInfo({ ...deliveryInfo, phone: e.target.value })
-                  }
-                  className="input-field"
-                />
+                <div className="form-group">
+                  <label>Адрес доставки</label>
+                  <input
+                    type="text"
+                    placeholder="ул. Примерная, д. 123, кв. 45"
+                    value={deliveryInfo.address}
+                    onChange={(e) =>
+                      setDeliveryInfo({ ...deliveryInfo, address: e.target.value })
+                    }
+                    className="input-field"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Номер телефона</label>
+                  <input
+                    type="tel"
+                    placeholder="+1 (555) 123-4567"
+                    value={deliveryInfo.phone}
+                    onChange={(e) =>
+                      setDeliveryInfo({ ...deliveryInfo, phone: e.target.value })
+                    }
+                    className="input-field"
+                  />
+                </div>
 
                 {orderStatus && (
-                  <div className={`order-status ${orderStatus.includes('✅') ? 'success' : 'error'}`}>
+                  <div className={`order-status ${statusType}`}>
                     {orderStatus}
                   </div>
                 )}
@@ -139,23 +213,34 @@ function Cart({ items, onRemove, onUpdateQuantity, onClear, user }) {
                   onClick={handleCheckout}
                   disabled={isCheckingOut || !user}
                 >
-                  {isCheckingOut ? '⏳ Обработка...' : '✅ Оформить заказ'}
+                  {isCheckingOut ? (
+                    <>
+                      <span className="spinner-small"></span>
+                      Обработка...
+                    </>
+                  ) : (
+                    '✅ Оформить заказ'
+                  )}
                 </button>
 
                 <button
-                  className="btn btn-clear"
+                  className="btn btn-secondary"
                   onClick={onClear}
                   disabled={isCheckingOut}
                 >
                   🗑️ Очистить корзину
                 </button>
-              </div>
 
-              {!user && (
-                <div className="auth-required">
-                  ⚠️ Требуется авторизация для оформления заказа
-                </div>
-              )}
+                {!user && (
+                  <div className="auth-warning">
+                    <span>⚠️</span>
+                    <div>
+                      <strong>Требуется вход в аккаунт</strong>
+                      <p>Пожалуйста, авторизуйтесь для оформления заказа</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -164,46 +249,61 @@ function Cart({ items, onRemove, onUpdateQuantity, onClear, user }) {
   );
 }
 
-function CartItem({ item, onRemove, onUpdateQuantity }) {
+function CartItem({ item, onRemove, onUpdateQuantity, isRemoving }) {
+  const getEmoji = () => {
+    const name = item.name?.toLowerCase() || '';
+    if (name.includes('ноут') || name.includes('laptop') || name.includes('book')) return '💻';
+    if (name.includes('мыш') || name.includes('mouse')) return '🖱️';
+    if (name.includes('клав') || name.includes('keyboard')) return '⌨️';
+    if (name.includes('монит') || name.includes('monitor')) return '🖥️';
+    return '📦';
+  };
+
+  const itemTotal = item.price * item.quantity;
+
   return (
     <div className="cart-item">
       <div className="item-image">
-        <span className="item-icon">
-          {item.name?.includes('Ноут')
-            ? '💻'
-            : item.name?.includes('Мышь')
-            ? '🖱️'
-            : item.name?.includes('Клав')
-            ? '⌨️'
-            : '📦'}
-        </span>
+        <span className="item-emoji">{getEmoji()}</span>
       </div>
 
       <div className="item-details">
-        <h3 className="item-name">{item.name}</h3>
-        <p className="item-description">{item.description}</p>
+        <h4 className="item-name">{item.name}</h4>
+        {item.description && (
+          <p className="item-description">{item.description}</p>
+        )}
       </div>
 
       <div className="item-price">
-        <span className="unit-price">${item.price}</span>
+        <span className="label">Цена:</span>
+        <span className="value">${item.price.toFixed(2)}</span>
       </div>
 
       <div className="item-quantity">
         <button
-          className="qty-btn"
-          onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
+          className="qty-btn minus"
+          onClick={() => {
+            if (item.quantity > 1) {
+              onUpdateQuantity(item.id, item.quantity - 1);
+            }
+          }}
+          disabled={item.quantity <= 1}
         >
           −
         </button>
         <input
           type="number"
           min="1"
+          max="99"
           value={item.quantity}
-          onChange={(e) => onUpdateQuantity(item.id, parseInt(e.target.value))}
+          onChange={(e) => {
+            const val = parseInt(e.target.value);
+            if (val > 0) onUpdateQuantity(item.id, val);
+          }}
           className="qty-input"
         />
         <button
-          className="qty-btn"
+          className="qty-btn plus"
           onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
         >
           +
@@ -211,15 +311,17 @@ function CartItem({ item, onRemove, onUpdateQuantity }) {
       </div>
 
       <div className="item-total">
-        <span className="total-price">${(item.price * item.quantity).toFixed(2)}</span>
+        <span className="label">Итого:</span>
+        <span className="value">${itemTotal.toFixed(2)}</span>
       </div>
 
       <button
         className="btn-remove"
-        onClick={() => onRemove(item.id)}
+        onClick={() => handleRemoveItem(item.id)}
         title="Удалить из корзины"
+        disabled={isRemoving[item.id]}
       >
-        ✕
+        {isRemoving[item.id] ? '⏳' : '🗑️'}
       </button>
     </div>
   );

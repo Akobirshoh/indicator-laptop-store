@@ -1,33 +1,178 @@
-from fastapi import BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, delete
+from typing import List, Optional
+from pydantic import BaseModel
 
-def send_order_email(email: str, order_id: int):
-    # Имитация отправки email 
-    print(f"Письмо отправлено на {email} по заказу №{order_id}")
+from app.api.deps import get_db, get_current_user
+from app.models.order import Order, OrderItem, CartItem
+from app.models.item import Item
+from app.models.user import User
 
-@router.post("/checkout")
-async def checkout(background_tasks: BackgroundTasks, user=Depends(get_current_user)):
-    # ... логика создания заказа ...
-    background_tasks.add_task(send_order_email, user.email, new_order.id) [cite: 185]
-    return {"msg": "Заказ принят, уведомление отправлено"}
+router = APIRouter()
 
-@router.post("/checkout") # Создание заказа [cite: 88]
-async def checkout(db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
-    # 1. Получаем все товары из корзины [cite: 91]
-    cart_items_query = await db.execute(select(CartItem).where(CartItem.user_id == user.id))
-    cart_items = cart_items_query.scalars().all()
+# ===== PYDANTIC SCHEMAS =====
+
+class OrderItemCreate(BaseModel):
+    item_id: int
+    quantity: int
+    price: float
+
+class OrderCreate(BaseModel):
+    items: List[OrderItemCreate]
+    total_price: float
+    delivery_address: str
+    delivery_phone: str
+    status: Optional[str] = "pending"
+
+class OrderResponse(BaseModel):
+    id: int
+    user_id: int
+    total_price: float
+    delivery_address: str
+    delivery_phone: str
+    status: str
     
-    if not cart_items:
-        raise HTTPException(status_code=400, detail="Корзина пуста")
+    class Config:
+        from_attributes = True
+
+# ===== ORDER ENDPOINTS =====
+
+@router.post("/")
+async def create_order(
+    order_data: OrderCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    """Создать новый заказ"""
     
-    total = 0
-    # Здесь должна быть логика расчета цены каждого товара...
+    if not order_data.items:
+        raise HTTPException(status_code=400, detail="Заказ должен содержать товары")
     
-    # 2. Создаем заказ [cite: 85]
-    new_order = Order(user_id=user.id, total_price=total)
-    db.add(new_order)
+    if not order_data.delivery_address or not order_data.delivery_phone:
+        raise HTTPException(status_code=400, detail="Требуется адрес доставки и телефон")
     
-    # 3. Очищаем корзину после покупки [cite: 91]
-    await db.execute(delete(CartItem).where(CartItem.user_id == user.id))
-    await db.commit()
+    try:
+        # Создаем заказ
+        new_order = Order(
+            user_id=user.id,
+            total_price=order_data.total_price,
+            delivery_address=order_data.delivery_address,
+            delivery_phone=order_data.delivery_phone,
+            status=order_data.status or "pending"
+        )
+        db.add(new_order)
+        await db.flush()  # Получить ID заказа
+        
+        # Добавляем товары в заказ
+        for item_data in order_data.items:
+            order_item = OrderItem(
+                order_id=new_order.id,
+                item_id=item_data.item_id,
+                quantity=item_data.quantity,
+                price=item_data.price
+            )
+            db.add(order_item)
+        
+        # Очищаем корзину пользователя
+        await db.execute(delete(CartItem).where(CartItem.user_id == user.id))
+        
+        await db.commit()
+        
+        return {
+            "message": "Заказ успешно создан",
+            "order_id": new_order.id,
+            "status": "success"
+        }
     
-    return {"message": "Заказ оформлен", "order_id": new_order.id}
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Ошибка создания заказа: {str(e)}")
+
+@router.get("/")
+async def get_user_orders(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    """Получить все заказы пользователя"""
+    
+    result = await db.execute(
+        select(Order).where(Order.user_id == user.id)
+    )
+    orders = result.scalars().all()
+    
+    return [
+        {
+            "id": order.id,
+            "user_id": order.user_id,
+            "total_price": order.total_price,
+            "delivery_address": order.delivery_address,
+            "delivery_phone": order.delivery_phone,
+            "status": order.status
+        }
+        for order in orders
+    ]
+
+@router.get("/{order_id}")
+async def get_order_detail(
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    """Получить детали конкретного заказа"""
+    
+    order = await db.get(Order, order_id)
+    
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+    
+    if order.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Доступ запрещен")
+    
+    # Получаем товары из заказа
+    result = await db.execute(
+        select(OrderItem).where(OrderItem.order_id == order_id)
+    )
+    items = result.scalars().all()
+    
+    return {
+        "id": order.id,
+        "user_id": order.user_id,
+        "total_price": order.total_price,
+        "delivery_address": order.delivery_address,
+        "delivery_phone": order.delivery_phone,
+        "status": order.status,
+        "items": [
+            {
+                "item_id": item.item_id,
+                "quantity": item.quantity,
+                "price": item.price
+            }
+            for item in items
+        ]
+    }
+
+@router.get("/history/all")
+async def get_order_history(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    """Получить историю заказов пользователя"""
+    
+    result = await db.execute(
+        select(Order).where(Order.user_id == user.id).order_by(Order.id.desc())
+    )
+    orders = result.scalars().all()
+    
+    return {
+        "total": len(orders),
+        "orders": [
+            {
+                "id": order.id,
+                "total_price": order.total_price,
+                "status": order.status,
+                "address": order.delivery_address
+            }
+            for order in orders
+        ]
+    }

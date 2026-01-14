@@ -3,14 +3,14 @@ import './App.css';
 import Header from './components/Header';
 import ProductList from './components/ProductList';
 import Cart from './components/Cart';
-import { API_BASE_URL } from './config';
+import Profile from './components/Profile';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('products');
   const [cart, setCart] = useState([]);
   const [user, setUser] = useState(null);
 
-  // Загружаем корзину из локального хранилища
+  // Загружаем корзину и пользователя из локального хранилища
   useEffect(() => {
     const savedCart = localStorage.getItem('cart');
     if (savedCart) {
@@ -65,6 +65,7 @@ function App() {
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem('user');
+    localStorage.removeItem('token');
     setCurrentPage('products');
   };
 
@@ -76,6 +77,7 @@ function App() {
         cartCount={cart.length}
         user={user}
         onLogout={handleLogout}
+        onLogin={setUser}
       />
 
       <main className="main-content">
@@ -90,6 +92,9 @@ function App() {
             onClear={clearCart}
             user={user}
           />
+        )}
+        {currentPage === 'profile' && (
+          <Profile user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
         )}
       </main>
 
