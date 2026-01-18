@@ -22,7 +22,9 @@ async def create_tables():
 
 @app.on_event("startup")
 async def startup_event():
-    await create_tables()
+    # Пропускаем создание таблиц - используем SQLite
+    pass
+    # await create_tables()
 
 # Настройка CORS
 app.add_middleware(

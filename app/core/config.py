@@ -10,7 +10,6 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     # Настройки базы данных (Занятие 3)
-    # Используем SQLite для простоты разработки (без PostgreSQL)
     DATABASE_URL: str = "sqlite+aiosqlite:///./test.db"
 
     class Config:
